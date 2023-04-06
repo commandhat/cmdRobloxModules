@@ -56,6 +56,7 @@ end
 	@returns A decoded JSON table containing any response the Guilded API sent back. Can cause warns or errors if the response is bad.
 **--]]
 function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData: any)
+	if retryBackoff ~=0 then error("gildedRadio: In retry backoff mode. Please wait until isBusy returns false.")	end
 	grBusy = true
 	local HTTPS = game:GetService("HttpService")
 	local baseUrl = "https://www.guilded.gg/api/v1/"
@@ -68,12 +69,13 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 	builtRequest.Method = tab[mode]
 	builtRequest.Headers = {}
 	local fixedString = "Bearer " ..authHolder
-	builtRequest.Headers["Authorization"] = fixedString
 	builtRequest.Headers["Accept"] = "application/json"
 	builtRequest.Headers["Content-type"] = "application/json"
 	builtRequest.Headers["X-Identity"] = tostring(moduleVersion)
 	if requestData ~= nil then builtRequest.Body = tostring(HTTPS:JSONEncode(requestData)) end
-	if retryBackoff ~=0 then error("gildedRadio: In retry backoff mode. Please wait until isBusy returns false.")	end
+	builtRequest.Headers["Authorization"] = "**REMOVED**"
+	script.HTTPSend:Fire(builtRequest)
+	builtRequest.Headers["Authorization"] = fixedString
 	repeat
 		if retryBackoff ~=0 then repeat wait(1) retryBackoff = retryBackoff - 1 until retryBackoff == 0 end
 		pcall(function()
@@ -88,8 +90,6 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 		end
 	until response.Success or attempt == 8
 	if attempt == 8 then warn("gildedRadio: Guilded's API is down, or unreachable after 7 attempts with exponential backoff. If a response was received, it will be sent to HTTPReceive now.") end
-	builtRequest.Headers["Authorization"] = "**REMOVED**"
-	script.HTTPSend:Fire(builtRequest)
 	script.HTTPReceive:Fire(response)
 	grBusy = false
 	return Data
