@@ -89,6 +89,7 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 	until response.Success or attempt == 8
 	if attempt == 8 then warn("gildedRadio: Guilded's API is down, or unreachable after 7 attempts with exponential backoff. If a response was received, it will be sent to HTTPReceive now.") end
 	script.HTTPReceive:Fire(response)
+	retryBackoff = 0
 	grBusy = false
 	return Data
 end
