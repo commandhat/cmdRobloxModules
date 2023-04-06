@@ -1,38 +1,42 @@
 --[[**
-    Run gildedRadio.setup in your script to make the module ready to interact with your server. If the return value is a boolean reading false, check your console output to see what went wrong.
+    Run gildedRadio.setup in your script to make the module ready to interact with your server. If the return value is anythiing that isn't 0, then either your authKey or serverID is incorrect.
     This module has extensive documentation! Install the Documentation Reader plugin to read the docs from inside Studio. https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
-    Track this plugin on Github: https://github.com/commandhat/cmdRobloxModules/blob/main/gildedRadio.lua
+    Track this plugin on Github: 
 **--]]
 local gildedRadio = {}
 local authHolder = nil
 local servIDHolder = nil
-local shouldLogCalls = nil
 local retryBackoff = 0
+local grBusy = false
+local moduleVersion = "gildedRadio 0.2"
+
 
 --[[**
     Sets up the module to interact with a Guilded server. WARNING: Makes an HTTP request to verify Guilded connectivity.
     
     @param authKey[string,required] The authentication key used for your Guilded Bot. Make sure this is kept somewhere safe and private, like in ServerStorage!
     @param  serverID[string,required] The ID used for your server. Inside Guilded, enable Developer Mode, then right click your Server Icon on the left and click 'Copy Server ID.'
-    @param logCalls[boolean] whether or not gildedRadio should log HTTPService calls. If this is true, then gildedRadio will create an Event as a child underneath it called "HTTPCall". Each request gildedRadio makes will be echoed into the event, allowing for wrappers to log each call.
     
     @returns This function returns true if the module initialized successfully. If it returns false, something went wrong, check the console to learn what went wrong.
 **--]]
 function gildedRadio.setup(authKey: string,serverID: string,logCalls: boolean)
 	authHolder = authKey
 	servIDHolder = serverID
-	shouldLogCalls = logCalls
-	if gildedRadio.shouldLogCalls then
-		local logCallObject = Instance.new("BindableEvent")
-		logCallObject.Name = "HTTPCall"
-		logCallObject.Parent = script
-	end
+	local logCallObject = Instance.new("BindableEvent")
+	logCallObject.Name = "HTTPSend"
+	logCallObject.Parent = script
+	local logCallObject2 = Instance.new("BindableEvent")
+	logCallObject2.Name = "HTTPReceive"
+	logCallObject2.Parent = script
 	local resultData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder)
 	if resultData then return true else return false end
 end
 
 --[[**
     This function is the module's HTTPService API wrapper. Please do not touch it. If you want to log gildedRadio requests, please read the documentation for gildedRadio.setup() instead.
+
+	Note: This module uses a custom tag "X-Identity" to report library versioning. Guilded's library guidelines ask for a custom User-Agent, but that isn't possible at time of writing.
+	The author of this library does not have the ability to create a relevant topic for this issue. If there is one available, create an issue on the module's Github with the topic link.
     
     The default is seven retries because the last try requires a full minute of cooldown time. If, after a full minute, the last attempt still fails, it is assumed Guilded's API is down or unresponsive.
     
@@ -52,11 +56,13 @@ end
 	@returns A decoded JSON table containing any response the Guilded API sent back. Can cause warns or errors if the response is bad.
 **--]]
 function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData: any)
+	grBusy = true
 	local HTTPS = game:GetService("HttpService")
 	local baseUrl = "https://www.guilded.gg/api/v1/"
 	local response
 	local Data
 	local builtRequest = {}
+	local attempt = 0
 	builtRequest.Url = baseUrl.. "" ..ApiURL
 	local tab = {[0]="POST", [1]="GET",[2]="PUT",[3]="PATCH",[4]="DELETE",[5]="HEAD"}
 	builtRequest.Method = tab[mode]
@@ -65,14 +71,37 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 	builtRequest.Headers["Authorization"] = fixedString
 	builtRequest.Headers["Accept"] = "application/json"
 	builtRequest.Headers["Content-type"] = "application/json"
+	builtRequest.Headers["X-Identity"] = tostring(moduleVersion)
 	if requestData ~= nil then builtRequest.Body = tostring(HTTPS:JSONEncode(requestData)) end
-	pcall(function()
-		response = HTTPS:RequestAsync(builtRequest)
-		script.HTTPCall:Fire(builtRequest)
-		Data = HTTPS:JSONDecode(tostring(response.Body))
-	end)
-	if response.Success == false then warn("gildedRadio: Guilded's API servers rejected the request.") end
+	if retryBackoff ~=0 then error("gildedRadio: In retry backoff mode. Please wait until isBusy returns false.")	end
+	repeat
+		if retryBackoff ~=0 then repeat wait(1) retryBackoff = retryBackoff - 1 until retryBackoff == 0 end
+		pcall(function()
+			response = HTTPS:RequestAsync(builtRequest)
+			Data = HTTPS:JSONDecode(tostring(response.Body))
+		end)
+		if response.Success == false then warn("gildedRadio: Guilded's API rejected the request.")
+			if response.Header == "429" then
+				attempt = attempt + 1
+				retryBackoff = attempt^2
+			end
+		end
+	until response.Success or attempt == 8
+	if attempt == 8 then warn("gildedRadio: Guilded's API is down, or unreachable after 7 attempts with exponential backoff. If a response was received, it will be sent to HTTPReceive now.") end
+	builtRequest.Headers["Authorization"] = "**REMOVED**"
+	script.HTTPSend:Fire(builtRequest)
+	script.HTTPReceive:Fire(response)
+	grBusy = false
 	return Data
+end
+
+--[[**
+    Helper function to allow the creation of queues.
+
+	@returns true if the API is busy with a request at the moment of calling (most likely exponential backoff). False if the API is not busy (open to requests).
+**--]]
+function gildedRadio.isBusy()
+	if grBusy then return true else return false end
 end
 
 --[[**
@@ -135,9 +164,9 @@ end
 **--]]
 function gildedRadio.makeChannel(name:string,topic:string,isPublic:boolean,typeOfChannel:number,groupID:string,categoryID:number)
 	local channelData = {}
-	if not name and not typeOfChannel then error("gildedRadio.makeChannel: incomplete channel information") else channelData.name = name end
+	if not name or not typeOfChannel then error("gildedRadio.makeChannel: incomplete channel information") else channelData.name = name end
 	if topic then channelData.topic = topic end
-	if isPublic then channelData.isPublic = isPublic end
+	if isPublic then channelData.isPublic = true elseif isPublic ~= nil then channelData.isPublic = false end
 	local tab = {[0]="announcements", [1]="chat",[2]="calendar",[3]="forums",[4]="media",[5]="docs",[6]="voice",[7]="list",[8]="scheduling",[9]="stream"}
 	channelData["type"] = tab[typeOfChannel]
 	if groupID then channelData.groupID = groupID end
@@ -149,7 +178,8 @@ end
 --[[**
 	Changes the name, topic, or publicity of a channel.
 	
-	@param name[string,required,maxlen=100] The new name of your channel. Maximum length is 100, will warn and cut off if you feed more then 100 characters.
+	@param chanID[string,required]
+	@param name[string,maxlen=100] The new name of your channel. Maximum length is 100, will warn and cut off if you feed more then 100 characters.
 	@param topic[string,maxlen=512] The new topic of your new channel, displays as a line of text along the top of the channel that users can click to read better. Pass 'nil' to leave empty.
 	@param isPublic[bool,required] Whether or not the channel will be visible to @everyone.
 	
@@ -159,14 +189,16 @@ end
 	
 	https://www.guilded.gg/docs/api/channels/ServerChannel
 **--]]
-function gildedRadio.setChannel(name:string,topic:string,isPublic:boolean,groupID:string,categoryID:number)
+function gildedRadio.setChannel(chanID:string,name:string,topic:string,isPublic:boolean,groupID:string,categoryID:number)
 	local channelData = {}
-	if not name then error("gildedRadio.setChannel: incomplete channel information") else channelData.name = name end
+	if not chanID then error("gildedRadio.setChannel: missing channel ID") end
+	if not name and not topic and not groupID and not categoryID and isPublic == nil then error("gildedRadio.setChannel: no content detected, not updating.") end
+	if name then channelData.name = name end
 	if topic then channelData.topic = topic end
-	if isPublic then channelData.isPublic = true end
+	if isPublic then channelData.isPublic = true elseif isPublic ~= nil then channelData.isPublic = false end
 	if groupID then channelData.groupID = groupID end
 	if categoryID then channelData.groupID = categoryID end
-	local channelData = gildedRadio.internalMakeRequest(3,"channels/",channelData)
+	local channelData = gildedRadio.internalMakeRequest(3,"channels/" ..chanID,channelData)
 	return channelData
 end
 	
@@ -241,11 +273,11 @@ end
 	Reads text messages from an Announcements, Chat, or Voice channel.
 	
 	@param chanID[string,required] The internal ID of the channel you want to read from.
-	@param count[number,min=1,max=100] How many messages you want Guilded to return. Defaults to 10 if not specified, to keep API responses fast.
+	@param count[number,max=100] How many messages you want Guilded to return. Defaults to 10 if not specified, to keep API responses fast.
 	@param before[string] Include an ISO 8601 timestamp as a string in this parameter, and Guilded will only send the most recent messages created before that date.
 	@param includePrivate[boolean] Include private messages between users. Will error if set to true and your API token does not have the "Access Moderator View" permission.
 	
-	@returns A table consisting of multiple counts of Guilded's ChatMessage models, populated with information from the last X messages you requested.
+	@returns A table consisting of multiple counts of Guilded's ChatMessage models, populated with information from the most recent X messages you requested.
 	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
 	
 	More information on the ChatMessage model: https://www.guilded.gg/docs/api/chat/ChatMessage
@@ -277,18 +309,20 @@ function gildedRadio.getMessage(chanID:string,messageID:string)
 end
 
 --[[**
-	Edits a message that the bot your API token is controlling has sent.
+	Edits a message that the bot your API token is controlling has sent. Can also edit embedded messages.
 	
 	@param chanID[string,required] The internal ID of the channel your message is in.
 	@param messageID[string,required] The ID of the message you want to edit.
-	@param content[string,required] 
+	@param content[string,oneof] The new content of the message you are editing.
+	@param embed[table,oneof] The new content of the message's embed. Can be used to add an embed to an existing message.
 	
 	@returns A table consisting of Guilded's ChatMessage model, populated with information from the message you requested.
 
 	More information on the ChatMessage model: https://www.guilded.gg/docs/api/chat/ChatMessage
 **--]]
 function gildedRadio.setMessage(chanID:string,messageID:string,content:string,embed:any)
-	if not chanID or not messageID or not content then error("gildedRadio.setMessage: Missing channel ID or message ID") end
+	if not chanID or not messageID then error("gildedRadio.setMessage: Missing channel ID or message ID") end
+	if not content and not embed then error("gildedRadio.setMessage: both content and embed are empty, nothing to update") end
 	local messageData = {}
 	messageData.content = content
 	messageData.embeds = {}
@@ -508,7 +542,6 @@ end
 function gildedRadio.deleteRole(userID: string,roleID: string)
 	if not userID or not roleID then error("gildedRadio.deleteRole: Missing user ID or role ID") end
 	local GuildedData = gildedRadio.internalMakeRequest(4,"servers/" ..servIDHolder.. "/members/" ..userID.. "/roles/" ..roleID)
-	return GuildedData
 end
 
 --[[**
@@ -531,8 +564,209 @@ end
 **--]]
 function gildedRadio.removeGroup(userID: string,groupID: string)
 	if not userID or not groupID then error("gildedRadio.removeGroup: Missing user ID or group ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(4,"groups/" ..groupID.. "/members/" ..userID)
+	gildedRadio.internalMakeRequest(4,"groups/" ..groupID.. "/members/" ..userID)
+end
+
+--[[**
+	Reads topics in bulk from a Forum channel.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param count[number,max=100] How many topics you want Guilded to return. Defaults to 10 if not specified, to keep API responses fast.
+	@param before[string] Include an ISO 8601 timestamp as a string in this parameter, and Guilded will only send the most recent messages created before that date.
+	
+	@returns A table consisting of Guilded's FroumTopicSummary model, populated with information from the most recent X topics you requested.
+	Topics will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
+	
+	More information on the ChatMessage model: https://www.guilded.gg/docs/api/forums/ForumTopicSummary
+**--]]
+function gildedRadio.getTopicBulk(chanID:string,count:number,before:string)
+	if not chanID then error("gildedRadio.getMessageBulk: Missing channel ID") end
+	local searchData = {}
+	if count then searchData.limit = count else searchData.limit = 10 end
+	if before then searchData.before = before end
+	local GuildedData = gildedRadio.internalMakeRequest(1,"channels/" ..chanID.. "/topic", searchData)
 	return GuildedData
+end
+
+--[[**
+	Reads a specific topic from a Forum channel.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param topicID[string,required] The internal ID of the forum topic you're reading.
+	
+	@returns A table consisting of Guilded's ForumTopic model, populated with information from the first post in the topic (also called Original Post or OP).
+	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
+	
+	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopic
+**--]]
+function gildedRadio.getTopic(chanID:string,topicID:string)
+	if not chanID or not topicID then error("gildedRadio.getTopic: Missing channel ID or topic ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(1,"channels/" ..chanID.. "/topics/".. topicID)
+	return GuildedData
+end
+
+--[[**
+	Updates the first post in a topic in a Forum channel, if it's controlled by your bot.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param topicID[string,required] The internal ID of the forum topic you're editing.
+	@param title[string,maxlen=500] The new name of the topic.
+	@param content[string,maxlen=4000] The new content of the first post in the topic.
+	
+	@returns A table consisting of Guilded's ForumTopic model, populated with information from the first post in the topic (also called Original Post or OP).
+	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
+	
+	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopic
+**--]]
+function gildedRadio.updateTopic(chanID:string,topicID:string,title:string,content:string)
+	if not chanID then error("gildedRadio.updateTopic: Missing channel ID or topic ID") end
+	if not title or content then error("gildedRadio.updateTopic: No content detected, nothing to update") end
+	local GuildedData = gildedRadio.internalMakeRequest(3,"channels/" ..chanID.. "/topics/".. topicID)
+	return GuildedData
+end
+
+--[[**
+	Delete a specific topic from a Forum channel.
+	
+	@param chanID[string,required] The internal ID of the channel you want to edit.
+	@param topicID[string,required] The internal ID of the forum topic you're removing.
+**--]]
+function gildedRadio.deleteTopic(chanID:string,topicID:string)
+	if not chanID or not topicID then error("gildedRadio.deleteTopic: Missing channel ID or topic ID") end
+	gildedRadio.internalMakeRequest(4,"channels/" ..chanID.. "/topics/".. topicID)
+end
+
+--[[**
+	Pin a topic to the top of a Forum channel. The name is a consequence of matching function names with actions.
+	
+	@param chanID[string,required] The internal ID of the channel you want to manipulate.
+	@param topicID[string,required] The internal ID of the forum topic you're pinning.
+**--]]
+function gildedRadio.makeTopicPin(chanID:string,topicID:string)
+	if not chanID or not topicID then error("gildedRadio.makeTopicPin: Missing channel ID or topic ID") end
+	gildedRadio.internalMakeRequest(2,"channels/" ..chanID.. "/topics/" ..topicID.. "/pin")
+end
+
+--[[**
+	Unpin a topic to the top of a Forum channel. The name is a consequence of matching function names with actions.
+	
+	@param chanID[string,required] The internal ID of the channel you want to manipulate.
+	@param topicID[string,required] The internal ID of the forum topic you're pinning.
+**--]]
+function gildedRadio.deleteTopicPin(chanID:string,topicID:string)
+	if not chanID or not topicID then error("gildedRadio.deleteTopicPin: Missing channel ID or topic ID") end
+	gildedRadio.internalMakeRequest(4,"channels/" ..chanID.. "/topics/" ..topicID.. "/pin")
+end
+
+--[[**
+	Lock a forum topic, preventing replies from anyone except those with moderator permissions. The name is a consequence of matching function names with actions.
+	
+	@param chanID[string,required] The internal ID of the channel you want to manipulate.
+	@param topicID[string,required] The internal ID of the forum topic you're pinning.
+**--]]
+function gildedRadio.makeTopicLock(chanID:string,topicID:string)
+	if not chanID or not topicID then error("gildedRadio.makeTopicLock: Missing channel ID or topic ID") end
+	gildedRadio.internalMakeRequest(2,"channels/" ..chanID.. "/topics/" ..topicID.. "/lock")
+end
+
+--[[**
+	Unlock a forum topic, allowing replies from anyone with appropriate permission. The name is a consequence of matching function names with actions.
+	
+	@param chanID[string,required] The internal ID of the channel you want to manipulate.
+	@param topicID[string,required] The internal ID of the forum topic you're pinning.
+**--]]
+function gildedRadio.deleteTopicLock(chanID:string,topicID:string)
+	if not chanID or not topicID then error("gildedRadio.deleteTopicLock: Missing channel ID or topic ID") end
+	gildedRadio.internalMakeRequest(4,"channels/" ..chanID.. "/topics/" ..topicID.. "/lock")
+end
+
+--[[**
+	Reads a specific topic from a Forum channel.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param topicID[string,required] The internal ID of the forum topic you're reading.
+	
+	@returns A table consisting of Guilded's ForumTopic model, populated with information from the first post in the topic (also called Original Post or OP).
+	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
+	
+	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopic
+**--]]
+function gildedRadio.getTopicReplyBulk(chanID:string,topicID:string)
+	if not chanID or not topicID then error("gildedRadio.getTopicReplyBulk: Missing channel ID or topic ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(1,"channels/" ..chanID.. "/topics/"..topicID.. "/comments")
+	return GuildedData
+end
+
+--[[**
+	Reads a specific reply to a topic from a Forum channel.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param topicID[string,required] The internal ID of the forum topic you're reading.
+	@param replyID[string,required] The internal ID of the specific reply you want to read.
+	
+	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the first post in the topic (also called Original Post or OP).
+	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
+	
+	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopicComment
+**--]]
+function gildedRadio.getTopicReply(chanID:string,topicID:string,replyID:string)
+	if not chanID or not topicID or not replyID then error("gildedRadio.getTopicReply: Missing channel ID, topic ID, or reply ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(1,"channels/" ..chanID.. "/topics/"..topicID.. "/comments/" ..replyID)
+	return GuildedData
+end
+
+--[[**
+	Replies to a topic in a Forum channel.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param topicID[string,required] The internal ID of the forum topic you're reading.
+	@param content[string,required,maxlen=4000] The content of the reply you're making.
+	
+	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the first post in the topic (also called Original Post or OP).
+	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
+	
+	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopicComment
+**--]]
+function gildedRadio.makeTopicReply(chanID:string,topicID:string,content:string)
+	if not chanID or not topicID  then error("gildedRadio.getTopicReply: Missing channel ID or topic ID") end
+	local replyData = {}
+	replyData.content = content
+	local GuildedData = gildedRadio.internalMakeRequest(0,"channels/" ..chanID.. "/topics/"..topicID.. "/comments", replyData)
+	return GuildedData
+end
+
+--[[**
+	Updates a topic reply you made via bot.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param topicID[string,required] The internal ID of the forum topic you're reading.
+	@param replyID[string,required] The internal id of the reply you want to edit.
+	@param content[string,required,maxlen=4000] The content of the reply you're making.
+	
+	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the first post in the topic (also called Original Post or OP).
+	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
+	
+	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopicComment
+**--]]
+function gildedRadio.setTopicReply(chanID:string,topicID:string,replyID:string,content:string)
+	if not chanID or not topicID then error("gildedRadio.setTopicReply: Missing channel ID or topic ID") end
+	if not content then error("gildedRadio.setTopicReply: no content detected, not updating.") end
+	local replyData = {}
+	replyData.content = content
+	local GuildedData = gildedRadio.internalMakeRequest(3,"channels/" ..chanID.. "/topics/"..topicID.. "/comments", replyData)
+	return GuildedData
+end
+
+--[[**
+	Deletes a topic reply from a Forum channel.
+	
+	@param chanID[string,required] The internal ID of the channel you want to read from.
+	@param topicID[string,required] The internal ID of the forum topic you're reading.
+	@param replyID[string,required] The internal ID of the specific reply you want to delete.
+**--]]
+function gildedRadio.deleteTopicReply(chanID:string,topicID:string,replyID:string)
+	if not chanID or not topicID or not replyID then error("gildedRadio.deleteTopicReply: Missing channel ID, topic ID, or reply ID") end
+	gildedRadio.internalMakeRequest(4,"channels/" ..chanID.. "/topics/"..topicID.. "/comments/" ..replyID)
 end
 
 return gildedRadio
