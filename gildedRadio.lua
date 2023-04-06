@@ -309,7 +309,7 @@ end
 **--]]
 function gildedRadio.deleteMessage(chanID:string,messageID:string)
 	if not chanID or not messageID then error("gildedRadio.deleteMessage: Missing channel ID or message ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"channels/" ..chanID.. "/messages/" ..messageID)
+	local GuildedData = gildedRadio.internalMakeRequest(4,"channels/" ..chanID.. "/messages/" ..messageID)
 	return GuildedData
 end
 
@@ -367,7 +367,7 @@ end
 **--]]
 function gildedRadio.deleteMemberNick(userID: string,newNick: string)
 	if not userID or not newNick then error("gildedRadio.deleteMemberNick: Missing user ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/members/" ..userID.. "/nickname")
+	local GuildedData = gildedRadio.internalMakeRequest(4,"servers/" ..servIDHolder.. "/members/" ..userID.. "/nickname")
 	return GuildedData
 end
 
@@ -378,7 +378,7 @@ end
 **--]]
 function gildedRadio.kickMember(userID: string)
 	if not userID then error("gildedRadio.kickMember: Missing user ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/members/" ..userID)
+	local GuildedData = gildedRadio.internalMakeRequest(4,"servers/" ..servIDHolder.. "/members/" ..userID)
 	return GuildedData
 end
 
@@ -431,7 +431,7 @@ end
 **--]]
 function gildedRadio.deleteBan(userID: string)
 	if not userID then error("gildedRadio.createBan: Missing user ID") end
-	gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/bans/" ..userID)
+	gildedRadio.internalMakeRequest(4,"servers/" ..servIDHolder.. "/bans/" ..userID)
 end
 
 --[[**
@@ -507,7 +507,7 @@ end
 **--]]
 function gildedRadio.deleteRole(userID: string,roleID: string)
 	if not userID or not roleID then error("gildedRadio.deleteRole: Missing user ID or role ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/members/" ..userID.. "/roles/" ..roleID)
+	local GuildedData = gildedRadio.internalMakeRequest(4,"servers/" ..servIDHolder.. "/members/" ..userID.. "/roles/" ..roleID)
 	return GuildedData
 end
 
@@ -531,7 +531,7 @@ end
 **--]]
 function gildedRadio.removeGroup(userID: string,groupID: string)
 	if not userID or not groupID then error("gildedRadio.removeGroup: Missing user ID or group ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"groups/" ..groupID.. "/members/" ..userID)
+	local GuildedData = gildedRadio.internalMakeRequest(4,"groups/" ..groupID.. "/members/" ..userID)
 	return GuildedData
 end
 
