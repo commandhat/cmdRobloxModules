@@ -1,5 +1,5 @@
 --[[**
-    Run gildedRadio.setup in your script to make the module ready to interact with your server. If the return value is anythiing that isn't 0, then either your authKey or serverID is incorrect.
+    Run gildedRadio.setup in your script to make the module ready to interact with your server. If the return value is a boolean reading false, check your console output to see what went wrong.
     This module has extensive documentation! Install the Documentation Reader plugin to read the docs from inside Studio. https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
     Track this plugin on Github: https://github.com/commandhat/cmdRobloxModules/blob/main/gildedRadio.lua
 **--]]
