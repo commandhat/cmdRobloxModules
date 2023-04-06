@@ -704,7 +704,7 @@ end
 	@param topicID[string,required] The internal ID of the forum topic you're reading.
 	@param replyID[string,required] The internal ID of the specific reply you want to read.
 	
-	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the first post in the topic (also called Original Post or OP).
+	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the reply you requested.
 	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
 	
 	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopicComment
@@ -722,7 +722,7 @@ end
 	@param topicID[string,required] The internal ID of the forum topic you're reading.
 	@param content[string,required,maxlen=4000] The content of the reply you're making.
 	
-	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the first post in the topic (also called Original Post or OP).
+	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the reply you created.
 	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
 	
 	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopicComment
@@ -743,7 +743,7 @@ end
 	@param replyID[string,required] The internal id of the reply you want to edit.
 	@param content[string,required,maxlen=4000] The content of the reply you're making.
 	
-	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the first post in the topic (also called Original Post or OP).
+	@returns A table consisting of Guilded's ForumTopicComment model, populated with information from the reply you requested.
 	Messages will be ordered by their createdAt tag, which is an ISO 8601 timestamp.
 	
 	More information on the ForumTopic model: https://www.guilded.gg/docs/api/forums/ForumTopicComment
