@@ -83,10 +83,8 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 			Data = HTTPS:JSONDecode(tostring(response.Body))
 		end)
 		if response.Success == false then warn("gildedRadio: Guilded's API rejected the request.")
-			if response.Header == "429" then
-				attempt = attempt + 1
-				retryBackoff = attempt^2
-			end
+		attempt = attempt + 1
+		retryBackoff = attempt^2
 		end
 	until response.Success or attempt == 8
 	if attempt == 8 then warn("gildedRadio: Guilded's API is down, or unreachable after 7 attempts with exponential backoff. If a response was received, it will be sent to HTTPReceive now.") end
