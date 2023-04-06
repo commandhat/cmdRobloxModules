@@ -1,7 +1,7 @@
 --[[**
     Run gildedRadio.setup in your script to make the module ready to interact with your server. If the return value is anythiing that isn't 0, then either your authKey or serverID is incorrect.
     This module has extensive documentation! Install the Documentation Reader plugin to read the docs from inside Studio. https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
-    Track this plugin on Github: https://github.com/commandhat/cmdRobloxModules/blob/main/gildedRadio.lua
+    Track this plugin on Github: 
 **--]]
 local gildedRadio = {}
 local authHolder = nil
@@ -27,7 +27,7 @@ function gildedRadio.setup(authKey: string,serverID: string,logCalls: boolean)
 		logCallObject.Name = "HTTPCall"
 		logCallObject.Parent = script
 	end
-	local resultData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDholder)
+	local resultData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder)
 	if resultData then return true else return false end
 end
 
@@ -133,9 +133,9 @@ end
 	
 	https://www.guilded.gg/docs/api/channels/ServerChannel
 **--]]
-function gildedRadio.createChannel(name:string,topic:string,isPublic:boolean,typeOfChannel:number,groupID:string,categoryID:number)
+function gildedRadio.makeChannel(name:string,topic:string,isPublic:boolean,typeOfChannel:number,groupID:string,categoryID:number)
 	local channelData = {}
-	if not name and not typeOfChannel then error("gildedRadio.createChannel: incomplete channel information") else channelData.name = name end
+	if not name and not typeOfChannel then error("gildedRadio.makeChannel: incomplete channel information") else channelData.name = name end
 	if topic then channelData.topic = topic end
 	if isPublic then channelData.isPublic = isPublic end
 	local tab = {[0]="announcements", [1]="chat",[2]="calendar",[3]="forums",[4]="media",[5]="docs",[6]="voice",[7]="list",[8]="scheduling",[9]="stream"}
@@ -159,9 +159,9 @@ end
 	
 	https://www.guilded.gg/docs/api/channels/ServerChannel
 **--]]
-function gildedRadio.updateChannel(name:string,topic:string,isPublic:boolean,groupID:string,categoryID:number)
+function gildedRadio.setChannel(name:string,topic:string,isPublic:boolean,groupID:string,categoryID:number)
 	local channelData = {}
-	if not name then error("gildedRadio.updateChannel: incomplete channel information") else channelData.name = name end
+	if not name then error("gildedRadio.setChannel: incomplete channel information") else channelData.name = name end
 	if topic then channelData.topic = topic end
 	if isPublic then channelData.isPublic = true end
 	if groupID then channelData.groupID = groupID end
@@ -177,7 +177,7 @@ end
 	@param chanID[string,required] The internal ID of the channel you want to delete.
 **--]]
 function gildedRadio.deleteChannel(chanID:string)
-	if not chanID then error("gildedRadio.getChannel: channel ID missing") end
+	if not chanID then error("gildedRadio.deleteChannel: channel ID missing") end
 	gildedRadio.internalMakeRequest(4,"channels/" ..chanID)
 end
 
@@ -195,8 +195,8 @@ end
 	
 	More information on the ChatMessage model: https://www.guilded.gg/docs/api/chat/ChatMessage
 **--]]
-function gildedRadio.createMessage(chanID:string,content:string,isPrivate:boolean,isSilent:boolean,isReplyTo:any)
-	if not chanID or not content then error("gildedRadio.createMessage: Missing channel ID or content") end
+function gildedRadio.makeMessage(chanID:string,content:string,isPrivate:boolean,isSilent:boolean,isReplyTo:any)
+	if not chanID or not content then error("gildedRadio.makeMessage: Missing channel ID or content") end
 	local messageData = {}
 	messageData.content = tostring(content)
 	if isReplyTo then messageData.replyMessageIDs = {}
@@ -225,8 +225,8 @@ end
 	
 	More information on the ChatMessage model: https://www.guilded.gg/docs/api/chat/ChatMessage
 **--]]
-function gildedRadio.createEmbed(chanID:string,content:string,isPrivate:boolean,isSilent:boolean,embed:any)
-	if not chanID or not content or not embed then error("gildedRadio.createEmbedded: Missing channel ID, content, or embed") end
+function gildedRadio.makeEmbed(chanID:string,content:string,isPrivate:boolean,isSilent:boolean,embed:any)
+	if not chanID or not content or not embed then error("gildedRadio.makeEmbed: Missing channel ID, content, or embed") end
 	local messageData = {}
 	messageData.content = content
 	messageData.embeds = {}
@@ -250,8 +250,8 @@ end
 	
 	More information on the ChatMessage model: https://www.guilded.gg/docs/api/chat/ChatMessage
 **--]]
-function gildedRadio.readMessageBulk(chanID:string,count:number,before:string,includePrivate:boolean)
-	if not chanID then error("gildedRadio.readMessageMultiple: Missing channel ID") end
+function gildedRadio.getMessageBulk(chanID:string,count:number,before:string,includePrivate:boolean)
+	if not chanID then error("gildedRadio.getMessageBulk: Missing channel ID") end
 	local searchData = {}
 	if count then searchData.limit = count else searchData.limit = 10 end
 	if before then searchData.before = before end
@@ -270,8 +270,8 @@ end
 
 	More information on the ChatMessage model: https://www.guilded.gg/docs/api/chat/ChatMessage
 **--]]
-function gildedRadio.readMessage(chanID:string,messageID:string)
-	if not chanID or not messageID then error("gildedRadio.readMessages: Missing channel ID or message ID") end
+function gildedRadio.getMessage(chanID:string,messageID:string)
+	if not chanID or not messageID then error("gildedRadio.getMessage: Missing channel ID or message ID") end
 	local GuildedData = gildedRadio.internalMakeRequest(1,"channels/" ..chanID.. "/messages/" ..messageID)
 	return GuildedData
 end
@@ -287,8 +287,8 @@ end
 
 	More information on the ChatMessage model: https://www.guilded.gg/docs/api/chat/ChatMessage
 **--]]
-function gildedRadio.updateMessage(chanID:string,messageID:string,content:string,embed:any)
-	if not chanID or not messageID or not content then error("gildedRadio.updateMessage: Missing channel ID or message ID") end
+function gildedRadio.setMessage(chanID:string,messageID:string,content:string,embed:any)
+	if not chanID or not messageID or not content then error("gildedRadio.setMessage: Missing channel ID or message ID") end
 	local messageData = {}
 	messageData.content = content
 	messageData.embeds = {}
@@ -321,7 +321,7 @@ end
 	More information on the ServerMemberSummary model: https://www.guilded.gg/docs/api/members/ServerMemberSummary
 **--]]
 function gildedRadio.getMemberBulk()
-	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder.. "members")
+	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder.. "/members")
 	return GuildedData
 end
 
@@ -336,7 +336,7 @@ end
 **--]]
 function gildedRadio.getMember(userID: string)
 	if not userID then error("gildedRadio.getMember: Missing user ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder.. "members/" ..userID)
+	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder.. "/members/" ..userID)
 	return GuildedData
 end
 
@@ -351,11 +351,11 @@ end
 
 	More information on the ServerMember model: https://www.guilded.gg/docs/api/members/ServerMember
 **--]]
-function gildedRadio.updateMemberNick(userID: string,newNick: string)
+function gildedRadio.setMemberNick(userID: string,newNick: string)
 	if not userID or not newNick then error("gildedRadio.updateMemberNick: Missing user ID") end
 	local userData = {}
 	userData.nickname = newNick
-	local GuildedData = gildedRadio.internalMakeRequest(2,"servers/" ..servIDHolder.. "members/" ..userID.. "/nickname")
+	local GuildedData = gildedRadio.internalMakeRequest(2,"servers/" ..servIDHolder.. "/members/" ..userID.. "/nickname")
 	return GuildedData
 end
 
@@ -367,18 +367,71 @@ end
 **--]]
 function gildedRadio.deleteMemberNick(userID: string,newNick: string)
 	if not userID or not newNick then error("gildedRadio.deleteMemberNick: Missing user ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "members/" ..userID.. "/nickname")
+	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/members/" ..userID.. "/nickname")
 	return GuildedData
 end
 
 --[[**
 	Kicks a member from your server. He probably deserved it anyway.
 	
-	@param userID[string,required] The ID of the user you want to stop hearing from.
+	@param userID[string,required] The ID of the user you want to stop hearing from for a little bit.
 **--]]
 function gildedRadio.kickMember(userID: string)
 	if not userID then error("gildedRadio.kickMember: Missing user ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "members/" ..userID)
+	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/members/" ..userID)
+	return GuildedData
+end
+
+--[[**
+	Bans a member from your server. He absolutely deserved it anyway.
+	
+	@param userID[string,required] The ID of the user you want to never, ever hear from again.
+	
+	@returns Returns a ServerMemberBan model populated with information from the ban you just created.
+	
+	More information on the ServerMemberBan model is available here: https://www.guilded.gg/docs/api/member-bans/ServerMemberBan
+**--]]
+function gildedRadio.createBan(userID: string)
+	if not userID then error("gildedRadio.createBan: Missing user ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(0,"servers/" ..servIDHolder.. "/bans/" ..userID)
+	return GuildedData
+end
+
+--[[**
+	Gets a list of everyone you banned. In other words, the naughty list.
+	
+	@returns Returns a list a multiple ServerMemberBan models populated with information as needed.
+	
+	More information on the ServerMemberBan model is available here: https://www.guilded.gg/docs/api/member-bans/ServerMemberBan
+**--]]
+function gildedRadio.getBanBulk(userID: string)
+	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder.. "/bans")
+	return GuildedData
+end
+
+--[[**
+	Gets a specific user you banned. In other words, your dear rival.
+	
+	@param userID[string,required] The ID of the user you want to never, hear from again.
+	
+	@returns Returns a ServerMemberBan model populated with information from the ban you just created.
+	
+	More information on the ServerMemberBan model is available here: https://www.guilded.gg/docs/api/member-bans/ServerMemberBan
+**--]]
+function gildedRadio.getBan(userID: string)
+	if not userID then error("gildedRadio.createBan: Missing user ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder.. "/bans/" ..userID)
+	return GuildedData
+end
+
+--[[**
+	Removes a ban, allowing said user back into your server. Guess they didn't deserve it that much.
+	
+	@param userID[string,required] The ID of the user you want to hear from again.
+**--]]
+function gildedRadio.deleteBan(userID: string)
+	if not userID then error("gildedRadio.createBan: Missing user ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/bans/" ..userID)
 	return GuildedData
 end
 
