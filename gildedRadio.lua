@@ -431,7 +431,107 @@ end
 **--]]
 function gildedRadio.deleteBan(userID: string)
 	if not userID then error("gildedRadio.createBan: Missing user ID") end
-	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/bans/" ..userID)
+	gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/bans/" ..userID)
+end
+
+--[[**
+	Awards XP to a specific member. Give them a shot of happiness for something!
+	
+	@param userID[string,required] The ID of the user you want to reward.
+	@param incomingXp[number,required] The XP you're giving them.
+
+	@returns Returns a table with one member: "total", containing the new XP amount they have.
+**--]]
+function gildedRadio.awardXP(userID: string,incomingXp: number)
+	if not userID or not incomingXp then error("gildedRadio.awardXP: Missing user ID or XP number") end
+	local GuildedData = gildedRadio.internalMakeRequest(0,"servers/" ..servIDHolder.. "/members/" ..userID.. "/xp")
+	return GuildedData
+end
+
+--[[**
+	Awards XP to everyone with a specific role. Got a clan that just won a major war? This is for them.
+	WARNING: This function does not return, because Guilded does not return any results after this operation.
+	
+	@param roleID[string,required] The ID of the role you want to reward.
+	@param incomingXp[number,required] The XP you're giving them.
+**--]]
+function gildedRadio.awardXPBulk(roleID: string,incomingXp: number)
+	if not roleID or not incomingXp then error("gildedRadio.awardXP: Missing role ID or XP number") end
+	gildedRadio.internalMakeRequest(0,"servers/" ..servIDHolder.. "/roles/" ..roleID.. "/xp")
+end
+
+--[[**
+	Sets XP directly for aspecific member. Maybe you gave them a little too much happiness...
+	
+	@param userID[string,required] The ID of the user you want to edit.
+	@param incomingXp[number,required] The XP count you want them to have.
+
+	@returns Returns a table with one member: "total", containing the new XP amount they have.
+**--]]
+function gildedRadio.setXP(userID: string,incomingXp: number)
+	if not userID or not incomingXp then error("gildedRadio.setXP: Missing user ID or XP number") end
+	local GuildedData = gildedRadio.internalMakeRequest(2,"servers/" ..servIDHolder.. "/members/" ..userID.. "/xp")
+	return GuildedData
+end
+
+--[[**
+	Get all the roles assigned to a particular member.
+	
+	@param userID[string,required] The ID of the user you want to inspect.
+
+	@returns Returns a table of integers. Each integer is the ID for a given role.
+**--]]
+function gildedRadio.getRoles(userID: string)
+	if not userID then error("gildedRadio.getRoles: Missing user ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder.. "/members/" ..userID.. "/roles")
+	return GuildedData
+end
+
+--[[**
+	Add a role to someone's membership set.
+	
+	@param userID[string,required] The ID of the user you want to add the role to.
+	@param roleID[number,required] The ID of the role you want to give them.
+**--]]
+function gildedRadio.setRole(userID: string,roleID: string)
+	if not userID or not roleID then error("gildedRadio.setRole: Missing user ID or role ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(2,"servers/" ..servIDHolder.. "/members/" ..userID.. "/roles/" ..roleID)
+	return GuildedData
+end
+
+--[[**
+	Force someone to turn in their membership card for a given role.
+	
+	@param userID[string,required] The ID of the user you want to punish.
+	@param roleID[number,required] The ID of the role you want to shrink.
+**--]]
+function gildedRadio.deleteRole(userID: string,roleID: string)
+	if not userID or not roleID then error("gildedRadio.deleteRole: Missing user ID or role ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder.. "/members/" ..userID.. "/roles/" ..roleID)
+	return GuildedData
+end
+
+--[[**
+	Join someone to a group in your server.
+	
+	@param userID[string,required] The ID of the user you want to audit.
+	@param groupID[number,required] The ID of the group to add them to.
+**--]]
+function gildedRadio.setGroup(userID: string,groupID: string)
+	if not userID or not groupID then error("gildedRadio.setGroup: Missing user ID or group ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(2,"groups/" ..groupID.. "/members/" ..userID)
+	return GuildedData
+end
+
+--[[**
+	Remove someone from a group in your server.
+	
+	@param userID[string,required] The ID of the user you want to audit.
+	@param groupID[number,required] The ID of the group to take away from.
+**--]]
+function gildedRadio.removeGroup(userID: string,groupID: string)
+	if not userID or not groupID then error("gildedRadio.removeGroup: Missing user ID or group ID") end
+	local GuildedData = gildedRadio.internalMakeRequest(5,"groups/" ..groupID.. "/members/" ..userID)
 	return GuildedData
 end
 
