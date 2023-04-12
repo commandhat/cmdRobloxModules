@@ -76,15 +76,14 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 	builtRequest.Headers["Content-type"] = "application/json"
 	builtRequest.Headers["X-Secondary-User-Agent"] = moduleVersion.. " on Roblox " ..robloxVersion
 	if requestData ~= nil then builtRequest.Body = tostring(HTTPS:JSONEncode(requestData)) end
-	builtRequest.Headers["Authorization"] = "**REMOVED**"
-
-	builtRequest.Headers["Authorization"] = fixedString
 	repeat
 		if retryBackoff ~=0 then repeat wait(1) retryBackoff = retryBackoff - 1 until retryBackoff == 0 end
 		pcall(function()
+			builtRequest.Headers["Authorization"] = "**REMOVED**"
+			script.HTTPSend:Fire(builtRequest)
+			builtRequest.Headers["Authorization"] = fixedString
 			response = HTTPS:RequestAsync(builtRequest)
 			Data = HTTPS:JSONDecode(tostring(response.Body))
-			script.HTTPSend:Fire(builtRequest)
 		end)
 		if response.Success == false then warn("gildedRadio: Guilded's API rejected the request.")
 		attempt = attempt + 1
