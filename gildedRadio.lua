@@ -1,15 +1,15 @@
 --[[**
     Run gildedRadio.setup in your script to make the module ready to interact with your server. If the return value is anythiing that isn't 0, then either your authKey or serverID is incorrect.
     This module has extensive documentation! Install the Documentation Reader plugin to read the docs from inside Studio. https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
-    Track this plugin on Github: 
+    Track this plugin on Github: https://github.com/commandhat/cmdRobloxModules/edit/main/gildedRadio.lua
 **--]]
 local gildedRadio = {}
 local authHolder = nil
 local servIDHolder = nil
 local retryBackoff = 0
 local grBusy = false
-local moduleVersion = "gildedRadio 0.2"
-
+local moduleVersion = "gildedRadio 0.2.1"
+local robloxVersion = version() -- warning: deprecated. Roblox, why? Still seems to work...
 
 --[[**
     Sets up the module to interact with a Guilded server. WARNING: Makes an HTTP request to verify Guilded connectivity.
@@ -71,16 +71,17 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 	local fixedString = "Bearer " ..authHolder
 	builtRequest.Headers["Accept"] = "application/json"
 	builtRequest.Headers["Content-type"] = "application/json"
-	builtRequest.Headers["X-Identity"] = tostring(moduleVersion)
+	builtRequest.Headers["X-Secondary-User-Agent"] = moduleVersion.. " on Roblox " ..robloxVersion
 	if requestData ~= nil then builtRequest.Body = tostring(HTTPS:JSONEncode(requestData)) end
 	builtRequest.Headers["Authorization"] = "**REMOVED**"
-	script.HTTPSend:Fire(builtRequest)
+
 	builtRequest.Headers["Authorization"] = fixedString
 	repeat
 		if retryBackoff ~=0 then repeat wait(1) retryBackoff = retryBackoff - 1 until retryBackoff == 0 end
 		pcall(function()
 			response = HTTPS:RequestAsync(builtRequest)
 			Data = HTTPS:JSONDecode(tostring(response.Body))
+			script.HTTPSend:Fire(builtRequest)
 		end)
 		if response.Success == false then warn("gildedRadio: Guilded's API rejected the request.")
 		attempt = attempt + 1
