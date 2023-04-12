@@ -9,7 +9,10 @@ local servIDHolder = nil
 local retryBackoff = 0
 local grBusy = false
 local moduleVersion = "gildedRadio 0.2.1"
-local robloxVersion = version() -- warning: deprecated. Roblox, why? Still seems to work...
+local robloxVersion = version()
+
+--If you have a strict request budget or dislike request retries, change this to a 1. This can cause requests to fail on the first attempt, use with caution!
+local noRetries = 0
 
 --[[**
     Sets up the module to interact with a Guilded server. WARNING: Makes an HTTP request to verify Guilded connectivity.
@@ -87,7 +90,7 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 		attempt = attempt + 1
 		retryBackoff = attempt^2
 		end
-	until response.Success or attempt == 8
+	until response.Success or attempt == 8 or noRetries == 1
 	if attempt == 8 then warn("gildedRadio: Guilded's API is down, or unreachable after 7 attempts with exponential backoff. If a response was received, it will be sent to HTTPReceive now.") end
 	script.HTTPReceive:Fire(response)
 	retryBackoff = 0
