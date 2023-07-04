@@ -1,14 +1,15 @@
 --[[**
-    Run gildedRadio.setup in your script to make the module ready to interact with your server. If the return value is anythiing that isn't 0, then either your authKey or serverID is incorrect.
+    Run gildedRadio.setup on server startup to make the module ready to interact with your Guilded server. If the return value is false, then either your authKey or serverID is incorrect.
     This module has extensive documentation! Install the Documentation Reader plugin to read the docs from inside Studio. https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
-    Track this plugin on Github: https://github.com/commandhat/cmdRobloxModules/edit/main/gildedRadio.lua
+    Track this plugin (and make issues) on Github: https://github.com/commandhat/cmdRobloxModules/edit/main/gildedRadio.lua
+    @returns Nothing, but required to make this notice show up.
 **--]]
 local gildedRadio = {}
 local authHolder = nil
 local servIDHolder = nil
 local retryBackoff = 0
 local grBusy = false
-local moduleVersion = "gildedRadio 0.2.1"
+local moduleVersion = "gildedRadio 0.2.1.1"
 local robloxVersion = version()
 
 --If you have a strict request budget or dislike request retries, change this to a 1. This can cause requests to fail on the first attempt, use with caution!
@@ -16,10 +17,10 @@ local noRetries = 0
 
 --[[**
     Sets up the module to interact with a Guilded server. WARNING: Makes an HTTP request to verify Guilded connectivity.
+    If you want to log requests this module makes, then wait for this function to return true, then listen to "script.HTTPSend.Event".
     
     @param authKey[string,required] The authentication key used for your Guilded Bot. Make sure this is kept somewhere safe and private, like in ServerStorage!
-    @param  serverID[string,required] The ID used for your server. Inside Guilded, enable Developer Mode, then right click your Server Icon on the left and click 'Copy Server ID.'
-    
+    @param serverID[string,required] The ID used for your server. Inside Guilded, enable Developer Mode, then right click your Server Icon on the left and click 'Copy Server ID.'
     @returns This function returns true if the module initialized successfully. If it returns false, something went wrong, check the console to learn what went wrong.
 **--]]
 function gildedRadio.setup(authKey: string,serverID: string,logCalls: boolean)
@@ -37,9 +38,6 @@ end
 
 --[[**
     This function is the module's HTTPService API wrapper. Please do not touch it. If you want to log gildedRadio requests, please read the documentation for gildedRadio.setup() instead.
-
-	Note: This module uses a custom tag "X-Identity" to report library versioning. Guilded's library guidelines ask for a custom User-Agent, but that isn't possible at time of writing.
-	The author of this library does not have the ability to create a relevant topic for this issue. If there is one available, create an issue on the module's Github with the topic link.
     
     The default is seven retries because the last try requires a full minute of cooldown time. If, after a full minute, the last attempt still fails, it is assumed Guilded's API is down or unresponsive.
     
@@ -55,8 +53,7 @@ end
     Any other value will make the function throw an error.
     @param ApiURL[string,required] The portion of the API you want to make a request to. 
     @param requestData[table] A table containing the data you want sent. DO NOT JSONENCODE THIS TABLE, IT IS DONE INSIDE THIS FUNCTION.
-
-	@returns A decoded JSON table containing any response the Guilded API sent back. Can cause warns or errors if the response is bad.
+    @returns A decoded JSON table containing any response the Guilded API sent back. Can cause warns or errors if the response is bad.
 **--]]
 function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData: any)
 	if retryBackoff ~=0 then error("gildedRadio: In retry backoff mode. Please wait until isBusy returns false.")	end
@@ -100,7 +97,7 @@ end
 --[[**
     Helper function to allow the creation of queues.
 
-	@returns true if the API is busy with a request at the moment of calling (most likely exponential backoff). False if the API is not busy (open to requests).
+	@returns True if the API is busy with a request at the moment of calling (most likely exponential backoff). False if the API is not busy (open to requests).
 **--]]
 function gildedRadio.isBusy()
 	if grBusy then return true else return false end
@@ -109,11 +106,7 @@ end
 --[[**
 	Returns basic information about the server.
 	
-	@returns A table consisting of Guilded's Server model, populated with information on the channel you requested.
-	
-	For more information on how to read this table, see Guilded's API docs:
-	
-	https://www.guilded.gg/docs/api/servers/Server
+	@returns A table containing information on the channel you requested.
 **--]]
 function gildedRadio.getServerInfo()
 	local GuildedData = gildedRadio.internalMakeRequest(1,"servers/" ..servIDHolder)
@@ -121,15 +114,11 @@ function gildedRadio.getServerInfo()
 end
 
 --[[**
-	Gets basic channel information for a single channel. Requires your bot's API token to have "Read Messages" permission for said channel.
+	Gets basic channel information for a single channel.
 	
 	@param chanID[string,required] The internal ID of the channel you want information on.
 	
-	@returns A table consisting of Guilded's ServerChannel model, populated with information on the channel you requested.
-	
-	For more information on how to read this table, see Guilded's API docs:
-	
-	https://www.guilded.gg/docs/api/channels/ServerChannel
+	@returns A table consisting information on the channel you requested.
 **--]]
 function gildedRadio.getChannel(chanID:string)
 	if not chanID then error("gildedRadio.getChannel: channel ID missing") end
@@ -140,9 +129,9 @@ end
 --[[**
 	Creates a chat channel in a server group. Requires your bot's API token to have "Create Channels" permission for your server or group.
 	
-	@param name[string,required,maxlen=100] The name of your new channel. Maximum length is 100, will warn and cut off if you feed more then 100 characters.
+	@param name[string,required,maxlen=100] The name of your new channel. Maximum length is 100, will silently cut off if you feed more then 100 characters.
 	@param topic[string,maxlen=512] The topic of your new channel, displays as a line of text along the top of the channel that users can click to read better. Pass 'nil' to leave empty.
-	@param isPublic[bool] Whether or not the channel will be visible to @everyone.
+	@param isPublic[bool,required] Whether or not the channel will be visible to @everyone.
 	@param typeOfChannel[number,required] The type of channel to create:
 	
 	0: Announcements (for a group of users to read announcements)
@@ -155,6 +144,9 @@ end
 	7: List (A to-do list channel similar to, but not entirely like, Trello)
 	8: Scheduling (A channel where people list times they're available)
 	9: Stream (A single voice channel where people see each other's screens -- or cameras)
+        
+        NOTE: gildedRadio cannot read channel types 4, 6, or 9, ever. Roblox does not support voice or video streams outside their platform.
+        NOTE: gildedRadio currently cannot read channel types 2,5,7,8. Work to support these is ongoing.
 	@param groupID[string] The group the channel will be created in. If not provided, channel will appear at the server root instead.
 	@param categoryID[number] The category the channel will be created under. If not provided, will appear as a top-level channel in the group or server root.
 	
