@@ -1,62 +1,64 @@
 --[[**
-    Run gildedRadio.setup on server startup to make the module ready to interact with your Guilded server. If the return value is false, then either your authKey or serverID is incorrect.
-    This module has extensive documentation! Install the Documentation Reader plugin to read the docs from inside Studio. https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
-    Track this plugin (and make issues) on Github: https://github.com/commandhat/cmdRobloxModules/edit/main/gildedRadio.lua
-    @returns Nothing, but required to make this notice show up.
+	Run gildedRadio.setup on server startup to make the module ready to interact with your Guilded server. If the return value is false, then either your authKey or serverID is incorrect.
+	This module has extensive documentation! Install the Documentation Reader plugin to read the docs from inside Studio. https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
+	Track this plugin (and make issues) on Github: https://github.com/commandhat/cmdRobloxModules/edit/main/gildedRadio.lua
+
+	@returns Nothing, but required to make this notice show up.
 **--]]
 local gildedRadio = {}
 local authHolder = nil
 local servIDHolder = nil
 local retryBackoff = 0
 local grBusy = false
-local moduleVersion = "gildedRadio 0.2.1.1"
 local robloxVersion = version()
 
---If you have a strict request budget or dislike request retries, change this to a 1. This can cause requests to fail on the first attempt, use with caution!
-local noRetries = 0
+--Change this to false to disable request logging. You should absolutely disable this in production.
+local doLogging = true
+
+--If you have a strict request budget or dislike request retries, feel free to modify this.
+--Each wait time is calculated as (attempt^2). So on a third attempt of a request, GildedRadio would wait (3^2) = 9 seconds.
+local numRetries = 7
 
 --[[**
-    Sets up the module to interact with a Guilded server. WARNING: Makes an HTTP request to verify Guilded connectivity.
-    If you want to log requests this module makes, then wait for this function to return true, then listen to "script.HTTPSend.Event".
-    
-    @param authKey[string,required] The authentication key used for your Guilded Bot. Make sure this is kept somewhere safe and private, like in ServerStorage!
-    @param serverID[string,required] The ID used for your server. Inside Guilded, enable Developer Mode, then right click your Server Icon on the left and click 'Copy Server ID.'
-    @returns This function returns true if the module initialized successfully. If it returns false, something went wrong, check the console to learn what went wrong.
+	Sets up the module to interact with a Guilded server.
+	
+	@param authKey[string,required] The authentication key used for your Guilded Bot.
+	@param serverID[string,required] The ID used for your server.
+	
+	@returns Nothing, but required to make this notice show up.
 **--]]
-function gildedRadio.setup(authKey: string,serverID: string,logCalls: boolean)
+function gildedRadio.setup(authKey: string,serverID: string)
 	authHolder = authKey
 	servIDHolder = serverID
-	local logCallObject = Instance.new("BindableEvent")
-	logCallObject.Name = "HTTPSend"
-	logCallObject.Parent = script
-	local logCallObject2 = Instance.new("BindableEvent")
-	logCallObject2.Name = "HTTPReceive"
-	logCallObject2.Parent = script
-	local resultData = gildedRadio.internalMakeRequest(5,"servers/" ..servIDHolder)
-	if resultData then return true else return false end
+	if doLogging = true then
+		warn("gildedRadio: Debug logging is enabled! This may expose sensitive data about your Guilded server. Review lines 15, 16, and 17 to disable logging.")
+		local logCallObject = Instance.new("BindableEvent")
+		logCallObject.Name = "HTTPSend"
+		logCallObject.Parent = script
+		local logCallObject2 = Instance.new("BindableEvent")
+		logCallObject2.Name = "HTTPReceive"
+		logCallObject2.Parent = script
+	else end
 end
 
 --[[**
-    This function is the module's HTTPService API wrapper. Please do not touch it. If you want to log gildedRadio requests, please read the documentation for gildedRadio.setup() instead.
+	This function is internal to the module: Please don't call it directly, however it has been left public for usage if a developer decides it's necessary.
     
-    The default is seven retries because the last try requires a full minute of cooldown time. If, after a full minute, the last attempt still fails, it is assumed Guilded's API is down or unresponsive.
+	@param mode[number,required]
     
-    @param mode[number,required]
-    
-    0: POST
-    1: GET
-    2: PUT
-    3: PATCH
-    4: DELETE
-    5: HEAD
-    
-    Any other value will make the function throw an error.
-    @param ApiURL[string,required] The portion of the API you want to make a request to. 
-    @param requestData[table] A table containing the data you want sent. DO NOT JSONENCODE THIS TABLE, IT IS DONE INSIDE THIS FUNCTION.
-    @returns A decoded JSON table containing any response the Guilded API sent back. Can cause warns or errors if the response is bad.
+	0: POST
+	1: GET
+	2: PUT
+	3: PATCH
+	4: DELETE
+	5: HEAD
+
+	@param ApiURL[string,required] The portion of the API you want to make a request to. 
+	@param requestData[table] A table containing the data you want sent. Must not be encoded.
+	@returns Nothing, but required to make this notice show up.
 **--]]
 function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData: any)
-	if retryBackoff ~=0 then error("gildedRadio: In retry backoff mode. Please wait until isBusy returns false.")	end
+	if retryBackoff ~=0 then error("gildedRadio: In retry backoff mode. Please wait until gildedRadio.isBusy returns false.")	end
 	grBusy = true
 	local HTTPS = game:GetService("HttpService")
 	local baseUrl = "https://www.guilded.gg/api/v1/"
@@ -77,7 +79,7 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 		if retryBackoff ~=0 then repeat wait(1) retryBackoff = retryBackoff - 1 until retryBackoff == 0 end
 		pcall(function()
 			builtRequest.Headers["Authorization"] = "**REMOVED**"
-			script.HTTPSend:Fire(builtRequest)
+			if script.HTTPSend then script.HTTPSend:Fire(builtRequest) end
 			builtRequest.Headers["Authorization"] = fixedString
 			response = HTTPS:RequestAsync(builtRequest)
 			Data = HTTPS:JSONDecode(tostring(response.Body))
@@ -86,16 +88,27 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 		attempt = attempt + 1
 		retryBackoff = attempt^2
 		end
-	until response.Success or attempt == 8 or noRetries == 1
-	if attempt == 8 then warn("gildedRadio: Guilded's API is down, or unreachable after 7 attempts with exponential backoff. If a response was received, it will be sent to HTTPReceive now.") end
-	script.HTTPReceive:Fire(response)
+	until response.Success or attempt >= numRetries
+	if attempt == 8 then warn("gildedRadio: Guilded's API did not return a successful response. If a response was sent, match the status code with Guilded's API Documentation to figure out what went wrong.") end
+	if script.HTTPReceive then script.HTTPReceive:Fire(response) end
 	retryBackoff = 0
 	grBusy = false
-	return Data
+	return response.Data
+	--gildedRadio.processResponseTable(response.Data)
 end
-
 --[[**
-    Helper function to allow the creation of queues.
+	This function is internal to the module: Please don't call it directly, however it has been left public for usage if a developer decides it's necessary.
+	This function is incomplete and should not be called until completed and implemented.
+
+	@returns Nothing, but required to make this notice show up.
+**--]]
+function gildedRadio.processResponseTable(responseData: any)
+	local cleanedTable = {}
+	
+	
+end
+--[[**
+	Helper function to allow the creation of queues.
 
 	@returns True if the API is busy with a request at the moment of calling (most likely exponential backoff). False if the API is not busy (open to requests).
 **--]]
@@ -131,7 +144,6 @@ end
 	
 	@param name[string,required,maxlen=100] The name of your new channel. Maximum length is 100, will silently cut off if you feed more then 100 characters.
 	@param topic[string,maxlen=512] The topic of your new channel, displays as a line of text along the top of the channel that users can click to read better. Pass 'nil' to leave empty.
-	@param isPublic[bool,required] Whether or not the channel will be visible to @everyone.
 	@param typeOfChannel[number,required] The type of channel to create:
 	
 	0: Announcements (for a group of users to read announcements)
