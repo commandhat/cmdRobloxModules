@@ -74,6 +74,7 @@ function gildedRadio.internalMakeRequest(mode: number,ApiURL: string,requestData
 	builtRequest.Headers["Accept"] = "application/json"
 	builtRequest.Headers["Content-type"] = "application/json"
 	builtRequest.Headers["X-Secondary-User-Agent"] = moduleVersion.. " on Roblox " ..robloxVersion
+	builtRequest.Headers["X-Guilded-Bot-Api-Use-Official-Markdown"] = "true"
 	if requestData ~= nil then builtRequest.Body = tostring(HTTPS:JSONEncode(requestData)) end
 	repeat
 		if retryBackoff ~=0 then repeat wait(1) retryBackoff = retryBackoff - 1 until retryBackoff == 0 end
